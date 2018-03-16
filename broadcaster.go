@@ -7,12 +7,7 @@ import (
 	"time"
 )
 
-// Broadcaster is an extremely safe many-to-many lock to be used in
-// place of a doneChan or sync.WaitGroup because:
-//    1) Closing a doneChan more than once causes a panic
-// 	  2) Calling Wait() on sync.WaitGroup more than once causes a panic
-//    3) Calling Add() on sync.WaitGroup during a Wait() causes a panic
-//    4) Calling Done() on sync.WaitGroup before the first Add() causes a panic
+// Broadcaster is a flexible many-to-many lock to be used in place of a waitGroup
 type Broadcaster struct {
 	noCopy    noCopy
 	startOnce *sync.Once
