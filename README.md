@@ -1,6 +1,6 @@
 # simplesync
 
-```
+```Go
 func main() {
   workers := simplesync.NewWorkerPool(8)
   workers.Execute(func(i int) {
