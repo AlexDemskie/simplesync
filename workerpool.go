@@ -9,6 +9,7 @@ type WorkerPool struct {
 	bcastEnd   *Broadcaster
 	singleExec sync.Mutex
 	workFunc   func(thread int)
+	doneChan   chan struct{}
 }
 
 // NewWorkerPool returns a WorkerPool object that facilitates
@@ -22,6 +23,7 @@ func NewWorkerPool(numWorkers int) (pool *WorkerPool) {
 		bcastEnd:   NewBroadcaster(1),
 		singleExec: sync.Mutex{},
 		workFunc:   func(int) {},
+		doneChan:   make(chan struct{}, 1),
 	}
 	// spawning goroutines to execute work
 	go pool.bcastStart.Send()
@@ -31,6 +33,12 @@ func NewWorkerPool(numWorkers int) (pool *WorkerPool) {
 				pool.bcastStart.Receive()
 				pool.workFunc(thread)
 				pool.bcastEnd.Send()
+				select {
+				case <-pool.doneChan:
+					return
+				default:
+					continue
+				}
 			}
 		}(i)
 	}
@@ -53,4 +61,24 @@ func (pool *WorkerPool) Execute(someWork func(thread int)) {
 		pool.bcastEnd.Receive()
 	}
 	pool.singleExec.Unlock()
+}
+
+// Delete cancels the goroutines
+func (pool *WorkerPool) Delete() {
+	pool.singleExec.Lock()
+	defer pool.singleExec.Unlock()
+	// ensure that we aren't double closing a channel
+	select {
+	case <-pool.doneChan:
+		return
+	default:
+		close(pool.doneChan)
+	}
+	// now that the doneChan is closed we will unblock the workers
+	// so that they may see the closed doneChan terminate their goroutines
+	pool.workFunc = func(int) {}
+	go pool.bcastStart.Send()
+	for i := 0; i < pool.bcastStart.Len(); i++ {
+		pool.bcastEnd.Receive()
+	}
 }

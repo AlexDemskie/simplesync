@@ -1,10 +1,8 @@
 package simplesync
 
 import (
-	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 // Broadcaster is a flexible many-to-many lock to be used in place of a waitGroup
@@ -70,23 +68,8 @@ func (b *Broadcaster) Receive() {
 	return
 }
 
-// WaitWithTimeout returns an error if the timeout expires
-func (b *Broadcaster) WaitWithTimeout(timeout time.Duration) (err error) {
-	doneChan := make(chan struct{}, 1)
-	go func() {
-		b.Receive()
-		close(doneChan)
-	}()
-	select {
-	case <-doneChan:
-		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("timed out after %v", timeout)
-	}
-}
-
-// WaitWithDoneChan hands the calling function a doneChan to receive from
-func (b *Broadcaster) WaitWithDoneChan() (doneChan chan struct{}) {
+// ReceiveWithDoneChan hands the calling function a doneChan to receive from
+func (b *Broadcaster) ReceiveWithDoneChan() (doneChan chan struct{}) {
 	doneChan = make(chan struct{}, 1)
 	go func() {
 		b.Receive()
