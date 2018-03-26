@@ -29,7 +29,7 @@ func NewBroadcaster(receiverCount int) (b *Broadcaster) {
 	}
 }
 
-// Send unblocks the goroutines and waits for their completion
+// Send unblocks the goroutines
 func (b *Broadcaster) Send() int {
 	b.sending.Lock()
 	for i := 0; i < cap(b.startChan); i++ {

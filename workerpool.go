@@ -6,9 +6,9 @@ import "sync"
 type WorkerPool struct {
 	noCopy     noCopy
 	bcastStart *Broadcaster
-	bcastEnd   *Broadcaster
-	singleExec sync.Mutex
+	singleExec *sync.Mutex
 	workFunc   func(thread int)
+	finished   *sync.WaitGroup
 	doneChan   chan struct{}
 }
 
@@ -20,19 +20,20 @@ func NewWorkerPool(numWorkers int) (pool *WorkerPool) {
 	}
 	pool = &WorkerPool{
 		bcastStart: NewBroadcaster(numWorkers),
-		bcastEnd:   NewBroadcaster(1),
-		singleExec: sync.Mutex{},
+		singleExec: &sync.Mutex{},
 		workFunc:   func(int) {},
+		finished:   &sync.WaitGroup{},
 		doneChan:   make(chan struct{}, 1),
 	}
-	// spawning goroutines to execute work
+	pool.finished.Add(numWorkers)
 	go pool.bcastStart.Send()
+	// spawning goroutines to execute work
 	for i := 0; i < numWorkers; i++ {
 		go func(thread int) {
 			for {
 				pool.bcastStart.Receive()
 				pool.workFunc(thread)
-				pool.bcastEnd.Send()
+				pool.finished.Done()
 				select {
 				case <-pool.doneChan:
 					return
@@ -42,9 +43,7 @@ func NewWorkerPool(numWorkers int) (pool *WorkerPool) {
 			}
 		}(i)
 	}
-	for i := 0; i < numWorkers; i++ {
-		pool.bcastEnd.Receive()
-	}
+	pool.finished.Wait()
 	return pool
 }
 
@@ -56,10 +55,9 @@ func (pool *WorkerPool) Execute(someWork func(thread int)) {
 	pool.workFunc = someWork
 	// signal to the worker goroutines to start executing
 	// then wait for completion confirmation from each worker
+	pool.finished.Add(pool.bcastStart.Len())
 	pool.bcastStart.Send()
-	for i := 0; i < pool.bcastStart.Len(); i++ {
-		pool.bcastEnd.Receive()
-	}
+	pool.finished.Wait()
 	pool.singleExec.Unlock()
 }
 
@@ -77,8 +75,7 @@ func (pool *WorkerPool) Delete() {
 	// now that the doneChan is closed we will unblock the workers
 	// so that they may see the closed doneChan terminate their goroutines
 	pool.workFunc = func(int) {}
+	pool.finished.Add(pool.bcastStart.Len())
 	go pool.bcastStart.Send()
-	for i := 0; i < pool.bcastStart.Len(); i++ {
-		pool.bcastEnd.Receive()
-	}
+	pool.finished.Wait()
 }
