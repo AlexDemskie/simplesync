@@ -15,8 +15,8 @@ func NewWorkerPool(count int) (pool *WorkerPool) {
 	}
 	pool = &WorkerPool{
 		work: make(chan func(thread int), count),
-		syn:  make(chan struct{}, 0),
-		ack:  make(chan struct{}, 0),
+		syn:  make(chan struct{}, 1),
+		ack:  make(chan struct{}, 1),
 	}
 	for i := 0; i < count; i++ {
 		go func(thread int) {
